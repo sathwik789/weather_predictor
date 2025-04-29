@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     environment {
+        VENV_DIR = 'venv'
         REPO_URL = 'https://github.com/sathwik789/weather_predictor.git'
         BRANCH = 'main'
         FLASK_LOG = 'flask.log'
@@ -20,10 +21,20 @@ pipeline {
             }
         }
 
+        stage('Install pip if not present') {
+            steps {
+                sh '''
+                    # Check if pip is installed, if not install it
+                    python3 -m ensurepip --upgrade
+                    python3 -m pip --version
+                '''
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    # Install dependencies globally
+                    # Install the dependencies from requirements.txt
                     pip install -r requirements.txt
                 '''
             }
@@ -32,10 +43,8 @@ pipeline {
         stage('Run Flask Application') {
             steps {
                 sh '''
-                    # Run your Flask application
-                    export FLASK_APP=app.py
-                    export FLASK_ENV=development
-                    flask run --host=0.0.0.0 --port=5000
+                    # Activate virtual environment and run the Flask app
+                    python3 app.py
                 '''
             }
         }
@@ -43,7 +52,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ Pipeline succeeded! Flask app is running.'
+            echo '✅ Pipeline succeeded!'
         }
         failure {
             echo '❌ Pipeline failed! Check the steps.'
