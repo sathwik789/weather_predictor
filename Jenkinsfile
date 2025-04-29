@@ -6,9 +6,6 @@ pipeline {
         REPO_URL = 'https://github.com/sathwik789/weather_predictor.git'
         BRANCH = 'main'
         FLASK_LOG = 'flask.log'
-        IMAGE_NAME = 'sathwik789/weather_predictor'
-        IMAGE_TAG = 'latest'
-        DOCKER_CREDS_ID = 'docker-hub-credentials' // replace with your Jenkins credentials ID for Docker Hub
     }
 
     stages {
@@ -24,33 +21,22 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        // Optional: run the app (if you want to test without Docker)
+        stage('Run Application') {
             steps {
                 sh '''
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                '''
-            }
-        }
+                    # Create and activate virtual environment
+                    python3 -m venv ${VENV_DIR}
+                    source ${VENV_DIR}/bin/activate
+                    
+                    # Install dependencies
+                    pip install -r requirements.txt
 
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                    '''
-                }
-            }
-        }
-
-        // Optional: run the container to test
-        stage('Test Container') {
-            steps {
-                sh '''
-                    docker run -d --rm -p 5000:5000 --name test_weather_app ${IMAGE_NAME}:${IMAGE_TAG}
+                    # Run the Flask app (replace with your actual command)
+                    nohup flask run --host=0.0.0.0 --port=5000 > ${FLASK_LOG} 2>&1 &
                     sleep 5
                     curl -s http://localhost:5000 || echo "App might still be starting"
-                    docker stop test_weather_app
+                    pkill -f flask
                 '''
             }
         }
@@ -58,10 +44,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Pipeline with Docker succeeded!'
+            echo '✅ Pipeline succeeded!'
         }
         failure {
-            echo '❌ Pipeline failed! Check Docker build/push steps.'
+            echo '❌ Pipeline failed! Check the steps.'
         }
     }
 }
