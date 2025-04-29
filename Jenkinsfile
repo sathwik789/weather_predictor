@@ -20,7 +20,6 @@ pipeline {
 
         stage('Clone Repository') {
             steps {
-                sh 'git config --global http.sslVerify false' // Disable SSL verification temporarily
                 git credentialsId: 'github-pat', url: "${REPO_URL}", branch: "${BRANCH}"
             }
         }
@@ -58,17 +57,11 @@ pipeline {
     }
 
     post {
-        always {
-            node('any') {  // Added 'any' label here
-                echo '🧹 Cleaning up any leftover containers...'
-                sh 'docker rm -f $CONTAINER_NAME || true'
-            }
-        }
         success {
-            echo '✅ Pipeline succeeded!'
+            echo '✅ Pipeline with Docker succeeded!'
         }
         failure {
-            echo '❌ Pipeline failed during Docker update.'
+            echo '❌ Pipeline failed! Check Docker build/push steps.'
         }
     }
 }
