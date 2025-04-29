@@ -21,11 +21,12 @@ pipeline {
             }
         }
 
-        stage('Install pip if not present') {
+        stage('Install pip manually') {
             steps {
                 sh '''
-                    # Check if pip is installed, if not install it
-                    python3 -m ensurepip --upgrade
+                    # Manually install pip if ensurepip is not available
+                    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+                    python3 get-pip.py
                     python3 -m pip --version
                 '''
             }
