@@ -59,7 +59,7 @@ pipeline {
 
     post {
         always {
-            node {
+            node('any') {  // Added 'any' label here
                 echo '🧹 Cleaning up any leftover containers...'
                 sh 'docker rm -f $CONTAINER_NAME || true'
             }
