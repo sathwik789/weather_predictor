@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = 'devops_project'
+        CONTAINER_NAME = 'devops_project_container'
+        PORT = '5000'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo 'Building Docker image...'
+                sh 'docker build -t $IMAGE_NAME .'
+            }
+        }
+
+        stage('Run Docker Container') {
+            steps {
+                echo 'Running Docker container...'
+                // Remove any existing container with same name
+                sh '''
+                docker rm -f $CONTAINER_NAME || true
+                docker run -d --name $CONTAINER_NAME -p $PORT:$PORT $IMAGE_NAME
+                '''
+            }
+        }
+
+        stage('Verify App is Running') {
+            steps {
+                echo 'Waiting for app to be ready...'
+                // Install curl in Jenkins node or use wget if available
+                sh '''
+                sleep 10
+                curl --fail http://localhost:$PORT || (echo "App not responding" && exit 1)
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning up...'
+            sh 'docker rm -f $CONTAINER_NAME || true'
+        }
+    }
+}
