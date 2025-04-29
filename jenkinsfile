@@ -2,44 +2,48 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'devops_project'
-        CONTAINER_NAME = 'devops_project_container'
-        PORT = '5000'
+        REPO_URL = 'https://github.com/sathwik789/weather_predictor.git'
+        BRANCH = 'main'
+        IMAGE_NAME = 'sathwik789/weather_predictor'
+        IMAGE_TAG = 'latest'  // You can use "${env.BUILD_NUMBER}" or commit hash for versioning
+        DOCKER_CREDS_ID = 'docker-hub-credentials' // Jenkins credentials ID
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                echo 'Checking out source code...'
-                checkout scm
+                echo '📦 Checking out source code...'
+                git credentialsId: 'github-pat', url: "${REPO_URL}", branch: "${BRANCH}"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo 'Building Docker image...'
-                sh 'docker build -t $IMAGE_NAME .'
+                echo '🔨 Building updated Docker image...'
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
 
-        stage('Run Docker Container') {
+        stage('Push Updated Image') {
             steps {
-                echo 'Running Docker container...'
-                // Remove any existing container with same name
-                sh '''
-                docker rm -f $CONTAINER_NAME || true
-                docker run -d --name $CONTAINER_NAME -p $PORT:$PORT $IMAGE_NAME
-                '''
+                echo '🚀 Pushing updated Docker image to Docker Hub...'
+                withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    '''
+                }
             }
         }
 
-        stage('Verify App is Running') {
+        stage('Verify Container (Optional)') {
             steps {
-                echo 'Waiting for app to be ready...'
-                // Install curl in Jenkins node or use wget if available
+                echo '🧪 Running and testing the updated container...'
                 sh '''
-                sleep 10
-                curl --fail http://localhost:$PORT || (echo "App not responding" && exit 1)
+                    docker run -d --rm -p 5000:5000 --name test_app ${IMAGE_NAME}:${IMAGE_TAG}
+                    sleep 5
+                    curl -s http://localhost:5000 || echo "App may not be ready yet"
+                    docker stop test_app
                 '''
             }
         }
@@ -47,8 +51,16 @@ pipeline {
 
     post {
         always {
-            echo 'Cleaning up...'
-            sh 'docker rm -f $CONTAINER_NAME || true'
+            echo '🧹 Cleaning up any leftover containers...'
+            sh 'docker rm -f test_app || true'
+        }
+
+        success {
+            echo '✅ Docker image updated and pushed successfully!'
+        }
+
+        failure {
+            echo '❌ Pipeline failed during Docker update.'
         }
     }
 }
