@@ -2,31 +2,39 @@ pipeline {
     agent any
 
     environment {
+        VENV_DIR = 'venv'
         REPO_URL = 'https://github.com/sathwik789/weather_predictor.git'
         BRANCH = 'main'
+        FLASK_LOG = 'flask.log'
         IMAGE_NAME = 'sathwik789/weather_predictor'
-        IMAGE_TAG = 'latest'  // You can use "${env.BUILD_NUMBER}" or commit hash for versioning
-        DOCKER_CREDS_ID = 'docker-hub-credentials' // Jenkins credentials ID
+        IMAGE_TAG = 'latest'
+        DOCKER_CREDS_ID = 'docker-hub-credentials' // replace with your Jenkins credentials ID for Docker Hub
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Verify Python 3 Installation') {
             steps {
-                echo '📦 Checking out source code...'
+                sh 'python3 --version'
+            }
+        }
+
+        stage('Clone Repository') {
+            steps {
+                sh 'git config --global http.sslVerify false' // Disable SSL verification temporarily
                 git credentialsId: 'github-pat', url: "${REPO_URL}", branch: "${BRANCH}"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo '🔨 Building updated Docker image...'
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                sh '''
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                '''
             }
         }
 
-        stage('Push Updated Image') {
+        stage('Push Docker Image') {
             steps {
-                echo '🚀 Pushing updated Docker image to Docker Hub...'
                 withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
@@ -36,14 +44,14 @@ pipeline {
             }
         }
 
-        stage('Verify Container (Optional)') {
+        // Optional: run the container to test
+        stage('Test Container') {
             steps {
-                echo '🧪 Running and testing the updated container...'
                 sh '''
-                    docker run -d --rm -p 5000:5000 --name test_app ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker run -d --rm -p 5000:5000 --name test_weather_app ${IMAGE_NAME}:${IMAGE_TAG}
                     sleep 5
-                    curl -s http://localhost:5000 || echo "App may not be ready yet"
-                    docker stop test_app
+                    curl -s http://localhost:5000 || echo "App might still be starting"
+                    docker stop test_weather_app
                 '''
             }
         }
@@ -51,14 +59,14 @@ pipeline {
 
     post {
         always {
-            echo '🧹 Cleaning up any leftover containers...'
-            sh 'docker rm -f test_app || true'
+            node {
+                echo '🧹 Cleaning up any leftover containers...'
+                sh 'docker rm -f $CONTAINER_NAME || true'
+            }
         }
-
         success {
-            echo '✅ Docker image updated and pushed successfully!'
+            echo '✅ Pipeline succeeded!'
         }
-
         failure {
             echo '❌ Pipeline failed during Docker update.'
         }
