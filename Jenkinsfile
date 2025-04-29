@@ -21,13 +21,13 @@ pipeline {
             }
         }
 
-        stage('Install pip manually') {
+        stage('Create Virtual Environment') {
             steps {
                 sh '''
-                    # Manually install pip if ensurepip is not available
-                    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-                    python3 get-pip.py
-                    python3 -m pip --version
+                    # Create a virtual environment if it doesn't already exist
+                    python3 -m venv ${VENV_DIR}
+                    # Activate the virtual environment
+                    source ${VENV_DIR}/bin/activate
                 '''
             }
         }
@@ -35,7 +35,8 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    # Install the dependencies from requirements.txt
+                    # Activate the virtual environment and install dependencies
+                    source ${VENV_DIR}/bin/activate
                     pip install -r requirements.txt
                 '''
             }
@@ -44,8 +45,9 @@ pipeline {
         stage('Run Flask Application') {
             steps {
                 sh '''
-                    # Activate virtual environment and run the Flask app
-                    python3 app.py
+                    # Activate the virtual environment and run the Flask app
+                    source ${VENV_DIR}/bin/activate
+                    python app.py
                 '''
             }
         }
